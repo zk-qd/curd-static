@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+
+</head>
+
+<body>
+    <pre>测试本地Storage数据CURD</pre>
+    根据id删除<input type="text" value="0">
+    点击删除<button>删除数据</button>
+    <div></div>
+    <script src="./generateId.js"></script>
+    <script src="./data.js"></script>
+    <script src="./curd.js"></script>
+    <script>
+        var input = document.getElementsByTagName('input')[0],
+            button = document.getElementsByTagName('button')[0],
+            div = document.getElementsByTagName('div')[0];
+
+        var curd = new Curd({
+            data: generateId(data),
+            key: 'id',
+            storage: 'localDemo',
+        });
+
+        // 查询分页数据
+        function handlePage() {
+            var pageData = curd.read({
+                index: 1,
+                count: 10,
+            });
+            console.log(pageData);
+            div.innerHTML = JSON.stringify(pageData);
+        }
+        handlePage()
+
+        button.onclick = function (e) {
+            // 删除数据
+            var delResult = curd.delete(input.value);
+            console.log('删除', delResult);
+            alert(delResult.message);
+            handlePage()
+        }
+
+
+
+
+    </script>
+
+</body>
+
+</html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+
+</head>
+
+<body>
+    <pre>测试本地数据CURD</pre>
+    <script src="./generateId.js"></script>
+    <script src="./data.js"></script>
+    <script src="./curd.js"></script>
+    <script>
+
+        var curd = new Curd({
+            data: generateId(data),
+            key: 'id',
+            storage: false,
+        });
+
+
+        // 查询分页数据
+        var pageData = curd.read({
+            index: 1,
+            count: 10,
+            gender: '女',
+            name: '赵紫薇',
+        });
+        // 查询行数据 传入id
+        var rowData = curd.readRow(4);
+        // 添加数据
+        var addResult = curd.create({
+            "organization": "新添加的数据",
+            "username": "赵紫薇",
+            "name": "赵紫薇",
+            "gender": "女",
+            "phone": "15592191841",
+            "role": "用户",
+            "createDate": "2019/12/21",
+            "password": "zzw1593291452",
+            "cardType": "身份证",
+            "cardNum": "430202198212067000",
+            "birth": "1982/12/6",
+            "roleArea": "调度员"
+        });
+        // 修改数据
+        var modifyResult = curd.update({
+            "organization": "修改的数据",
+            "username": "谭顺元",
+            "name": "谭顺元",
+            "gender": "男",
+            "phone": "15874093888",
+            "role": "用户",
+            "createDate": "2019/12/21",
+            "password": "blink182 ",
+            "cardType": "身份证",
+            "cardNum": "430381198706272000",
+            "birth": "   1987/6/27",
+            "roleArea": "调度员",
+            "id": 1
+        });
+
+        console.log('分页', pageData);
+        console.log('行', rowData);
+        console.log('新增', addResult);
+        console.log('修改', modifyResult);
+        console.log('数据集合', curd.data);
+        // 删除数据
+        var delResult = curd.delete(1);
+        console.log('删除', delResult);
+        console.log('数据集合', curd.data);
+
+
+
+
+
+
+    </script>
+
+</body>
+
+</html>
