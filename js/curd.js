@@ -1,44 +1,33 @@
 
-/** 
- * CURD 
- * @param {Object} 数据data唯一字段id本地storageid
- * @returns {Curd} 
- * create： 创建一行数据 随机生成key
- * update：传入row替换数据
- * read：分页条件查询
- * readRow: 通过keyval返回一个数组
- * delete：根据keyval删除数据
- * 
- * query： 根据keyval获取行数据以及索引 内部方法
- * operationStorage: 将修改的数据存入到本地storage
- * updateOrDel： 内部方法 update和delete逻辑抽取
- * sCopy: 内部方法 拷贝对象而非数组
- * 注意事项: 该插件增删改只操作内存的数据 对于本地数据数据还是不会变化的
- * 不过还可以将数据存入localstorage中，从中读取，
- * */
-
-
-function Curd({ data, key, storage }) {
+function Curd({ data, key, storage, fuzzy }) {
     // 初始化数据
     var localData;
+    // 切换模式
     this.storage = storage;
     if (this.storage) {
         // 如果有storage那么开启storage模式
         localData = window.localStorage.getItem(this.storage)
-        this.data = localData && JSON.parse(localData) || data;
+        this.data = localData && JSON.parse(localData) || this.sCopy(data);
     } else {
-        this.data = data;
+        this.data = this.sCopy(data);
     }
+    // 唯一标识
     this.id = key;
+    // 控制模糊查询
+    this.fuzzy = fuzzy;
     this.common = {
         code: 200,
         success: true,
     };
+
 }
 Curd.prototype = {
     constructor: Curd,
     // 新增数据一般在开头
     create(row) {
+        // 修改
+        row = this.sCopy(row);
+
         row[this.id] = new Date().getTime();
         this.data.unshift(row);
         // 创建不可能失败
@@ -50,6 +39,7 @@ Curd.prototype = {
     },
     // 需要先查再改
     update(row) {
+        row = this.sCopy(row);
         return this.updateOrDel(row);
     },
     // 分页条件查询
@@ -57,8 +47,43 @@ Curd.prototype = {
         // 筛选数据
         var datas = this.data.filter(item => {
             for (let key in condition) {
-                //排除index以及count后 如果其中有一个值不等，那么就不要
-                if (key != 'index' && key != 'count' && item[key] != condition[key]) return false;
+                //排除index以及count后 且不匹配undefined和null以及空字符串 且库中有该字段 如果其中有一个值不等，那么就不要
+                if (key != 'index' && key != 'count'
+                    && condition[key] != undefined
+                    && condition[key] !== ''
+                    && item.hasOwnProperty(key)) {
+                    var result;
+                    switch (this.fuzzy) {
+                        case Object.prototype.toString.call(this.fuzzy) === '[object Function]':
+                            // 条件 和 库数据
+                            result = this.fuzzy(condition[key], item[key]);
+                            // 如果匹配成功 返回为true 和下面相反
+                            if (result) return false;
+                            break;
+                        case 'all':
+                            // 匹配任意位置
+                            result = new RegExp(condition[key]).test(item[key]);
+                            if (!result) return false;
+                            break;
+                        case 'begin':
+                            // 匹配开始位置
+                            result = new RegExp('^' + condition[key]).test(item[key]);
+                            if (!result) return false;
+                            break;
+                        case 'end':
+                            // 匹配结束位置
+                            result = new RegExp(condition[key] + '$').test(item[key]);
+                            if (!result) return false;
+                            break;
+                        default:
+                            // 不模糊查询
+                            result = new RegExp('^' + condition[key] + '$').test(item[key]);
+                            if (!result) return false;
+                            break;
+
+                    }
+
+                }
             }
             // 说明没有不等的
             return true;
@@ -69,14 +94,12 @@ Curd.prototype = {
             count = condition.count,
             pages = Math.ceil(size / count),
             rows = size,
-            cdatas = [];
+            start = (index - 1) * count,
+            end = start + count;
         //返回数据 
-        datas.slice((index - 1) * count, count).forEach(item => {
-            cdatas.push(this.sCopy(item));
-        })
         return Object.assign({
             data: {
-                datas: cdatas,
+                datas: this.sCopy(datas.slice(start, end)),
                 pages: pages,
                 rows: rows,
                 count: count,
@@ -90,7 +113,7 @@ Curd.prototype = {
         return Object.assign({
             data: {
                 // 存在返回有数据的数组 不存在返回空数组
-                datas: row ? [this.sCopy(row)] : [],
+                datas: [this.sCopy(row)] || [],
             }
         }, this.common)
     },
@@ -128,7 +151,11 @@ Curd.prototype = {
             index = this.query(row[this.id]).index;
             // 如果index=-1那么修改失败
             if (index != -1) {
-                result = this.data.splice(index, 1, row);
+                // row没有传入的字段不做修改
+                for (var key in row) {
+                    this.data[index][key] = row[key];
+                }
+                result = [this.data[index]];
             }
         } else if (val) {
             message = '删除';
@@ -145,18 +172,25 @@ Curd.prototype = {
         }
         else return Object.assign({ message: message + '失败', type: 0 }, this.common);
     },
-    // 拷贝
-    sCopy(obj) {
-        var o = {};
-        if (obj instanceof Object) {
+    sCopy: function (obj) {
+        var o;
+        if (Object.prototype.toString.call(obj) === '[object Object]') {
+            o = {};
             for (var key in obj) {
                 o[key] = this.sCopy(obj[key]);
             };
+        } else if (Object.prototype.toString.call(obj) === '[object Array]') {
+            o = [];
+            for (var [i, v] of obj.entries()) {
+                o[i] = this.sCopy(obj[i]);
+            }
         } else {
-            o = obj;
+            // 保持原型  不然会转成对象
+            o = obj.valueOf();
         }
         return o;
-    },
+    }
+
 }
 
 
